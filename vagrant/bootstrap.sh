@@ -62,35 +62,48 @@ ovs-ofctl add-flow egress actions=normal
 iptables -t nat -F
 iptables -t nat -A POSTROUTING -j MASQUERADE -s 10.10.10.0/24
 
+#clean up docker
+docker kill container1 proxy
+docker rm container1 proxy
 
-docker kill container1 container2
-docker rm container1 container2
+#start container 1 (not sure what it does)
 container1_id=$(docker run -d --net=none --privileged=true --name=container1 ubuntu /bin/bash -c "while true; do echo container1 |nc -l 80; done;")
-container2_id=$(docker run -d --net=none --privileged=true --name=container2 -e FRONTAL_HOSTNAME="localhost" -e FRONTAL_PORT="9090" nherbaut/adapted-video-osgi-bundle java -cp /maven/*:/maven/a fr.labri.progess.comet.app.App --frontalHostName 10.10.10.3 --frontalPort 8080 --host 0.0.0.0 --port 8080 )
 
+#start the proxy container
+proxy_id=$(docker run -d --net=none --privileged=true --name=proxy -e FRONTAL_HOSTNAME="localhost" -e FRONTAL_PORT="9090" nherbaut/adapted-video-osgi-bundle java -cp /maven/*:/maven/a fr.labri.progess.comet.app.App --frontalHostName 10.10.10.3 --frontalPort 8080 --host 0.0.0.0 --port 8080 )
+
+#cleanup old docker ports
 ovs-docker del-port ingress eth0 container1 > /dev/null
-ovs-docker del-port ingress eth0 container2 > /dev/null
+ovs-docker del-port ingress eth0 proxy > /dev/null
 
+#create new port on ovs
 ovs-docker add-port ingress eth0 container1 --ipaddress=10.10.10.11/24 --macaddress=00:00:00:00:00:01
 docker exec container1 ip r add default via 10.10.10.10 dev eth0
 
+#get info on container1
 CONTAINER_1_INGRESS_PORT=$(ovs-ofctl show ingress|sed -rn "s/^ ([0-9]+)\([a-f0-9]+_l\):.*/\1/p")
 CONTAINER_1_INGRESS_PORT_ID=$(ovs-ofctl show ingress|sed -rn "s/^ [0-9]+\(([a-f0-9]+_l)\):.*/\1/p")
 
-ovs-docker add-port ingress eth0 container2 --ipaddress=10.10.10.12/24 --macaddress=00:00:00:00:00:02
-docker exec container2 ip r add default via 10.10.10.10 dev eth0
+#add the internal port for the proxy
+ovs-docker add-port ingress eth0 proxy --ipaddress=10.10.10.12/24 --macaddress=00:00:00:00:00:02
+docker exec proxy ip r add default via 10.10.10.10 dev eth0
 
 CONTAINER_2_INGRESS_PORT=$(ovs-ofctl show ingress|grep -v $CONTAINER_1_INGRESS_PORT_ID|sed -rn "s/^ ([0-9]+)\([a-f0-9]+_l\):.*/\1/p")
 
-
+#clean up the lows on ingress
 ovs-ofctl del-flows ingress
+
+#add flow to mirlitone.com
 ovs-ofctl add-flow ingress ip,tcp,nw_dst=37.59.125.79,tcp_dst=80,actions=mod_dl_dst=00:00:00:00:00:01,mod_nw_dst=10.10.10.11,output:$CONTAINER_1_INGRESS_PORT
 ovs-ofctl add-flow ingress ip,tcp,in_port=$CONTAINER_1_INGRESS_PORT,tcp_src=80,actions=mod_nw_src=37.59.125.79,output:1
 
+#add flow to Labri
 ovs-ofctl add-flow ingress ip,tcp,in_port=1,nw_dst=147.210.8.59,tcp_dst=80,actions=mod_dl_dst=00:00:00:00:00:02,mod_nw_dst=10.10.10.12,mod_tp_dst=8080,output:$CONTAINER_2_INGRESS_PORT
 ovs-ofctl add-flow ingress ip,tcp,in_port=$CONTAINER_2_INGRESS_PORT,tcp_src=8080,actions=mod_nw_src=147.210.8.59,mod_tp_src=80,output:1
 
+#plug routing/nat
 ovs-ofctl add-flow ingress actions=normal
+
 
 
 

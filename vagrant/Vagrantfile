@@ -1,0 +1,42 @@
+# -*- mode: ruby -*-
+Vagrant.configure(2) do |config|
+  
+
+
+  config.vm.define "vhg" do |vhg|
+	vhg.vm.box = "debian/jessie64"
+    
+    
+    vhg.vm.provision :shell, path: "bootstrap.sh"
+	vhg.vm.network "public_network", bridge: "wlan0"
+	vhg.vm.network "private_network", ip: "10.10.10.10", virtualbox__intnet: "internal",  nictype: "AM79C973"
+	
+	config.vm.provider "virtualbox" do |vb|
+		vb.customize ["modifyvm", :id, "--nicpromisc3", "allow-all"]
+	end
+
+	
+  end
+  
+
+  
+  
+  config.vm.define "c1" do |c1|
+    c1.vm.box = "debian/jessie64"
+    c1.vm.network "private_network", ip: "10.10.10.2", virtualbox__intnet: "internal"
+    config.vm.provider "virtualbox" do |vb|
+	vb.customize ["modifyvm", :id, "--nicpromisc2", "allow-all"]
+	end
+  end
+  
+  config.vm.define "c2" do |c2|
+    c2.vm.box = "debian/jessie64"
+    c2.vm.network "private_network", ip: "10.10.10.3", virtualbox__intnet: "internal"
+    config.vm.provider "virtualbox" do |vb|
+		vb.customize ["modifyvm", :id, "--nicpromisc2", "allow-all"]
+	end
+  end
+  
+  
+  
+end

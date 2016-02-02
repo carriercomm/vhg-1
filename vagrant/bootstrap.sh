@@ -10,6 +10,8 @@ apt-get update
 apt-get install --yes docker-engine openvswitch-switch
 service docker start
 
+docker pull nherbaut/adapted-video-osgi-bundle
+
 #ip v4 forwarding on the machine
 sysctl -w net.ipv4.ip_forward=1
 
@@ -67,10 +69,10 @@ docker kill container1 proxy
 docker rm container1 proxy
 
 #start container 1 (not sure what it does)
-container1_id=$(docker run -d --net=none --privileged=true --name=container1 ubuntu /bin/bash -c "while true; do echo container1 |nc -l 80; done;")
+container1_id=$(docker run -d --net=none --privileged=true --name=container1 nherbaut/adapted-video-osgi-bundle /bin/bash -c "while true; do echo container1 |nc -l 80; done;")
 
 #start the proxy container
-proxy_id=$(docker run -d --net=none --privileged=true --name=proxy -e FRONTAL_HOSTNAME="localhost" -e FRONTAL_PORT="9090" nherbaut/adapted-video-osgi-bundle java -cp /maven/*:/maven/a fr.labri.progess.comet.app.App --frontalHostName 10.10.10.3 --frontalPort 8080 --host 0.0.0.0 --port 8080 )
+proxy_id=$(docker run -d --net=none --privileged=true --name=proxy -e FRONTAL_HOSTNAME="localhost" -e FRONTAL_PORT="9090" nherbaut/adapted-video-osgi-bundle java -cp /maven/*:/maven/a fr.labri.progess.comet.app.App --frontalHostName 10.10.10.3 --frontalPort 8080 --host 0.0.0.0 --port 8080 --debug)
 
 #cleanup old docker ports
 ovs-docker del-port ingress eth0 container1 > /dev/null

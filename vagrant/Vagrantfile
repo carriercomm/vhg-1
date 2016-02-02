@@ -1,4 +1,12 @@
 # -*- mode: ruby -*-
+
+
+$script = <<SCRIPT
+ip r del default
+ip r add default via 10.10.10.10 dev eth1
+SCRIPT
+
+
 Vagrant.configure(2) do |config|
   
 
@@ -8,8 +16,12 @@ Vagrant.configure(2) do |config|
     
     
     vhg.vm.provision :shell, path: "bootstrap.sh"
-	vhg.vm.network "public_network", bridge: "wlan0"
+	vhg.vm.network "public_network", bridge: "eth0"
 	vhg.vm.network "private_network", ip: "10.10.10.10", virtualbox__intnet: "internal",  nictype: "AM79C973"
+	vhg.vm.network "public_network", bridge: "eth0"
+	
+	
+	
 	
 	config.vm.provider "virtualbox" do |vb|
 		vb.customize ["modifyvm", :id, "--nicpromisc3", "allow-all"]
@@ -24,6 +36,7 @@ Vagrant.configure(2) do |config|
   config.vm.define "c1" do |c1|
     c1.vm.box = "debian/jessie64"
     c1.vm.network "private_network", ip: "10.10.10.2", virtualbox__intnet: "internal"
+    c1.vm.provision "shell", inline: $script
     config.vm.provider "virtualbox" do |vb|
 	vb.customize ["modifyvm", :id, "--nicpromisc2", "allow-all"]
 	end
@@ -32,9 +45,10 @@ Vagrant.configure(2) do |config|
   config.vm.define "c2" do |c2|
     c2.vm.box = "debian/jessie64"
     c2.vm.network "private_network", ip: "10.10.10.3", virtualbox__intnet: "internal"
+    c2.vm.provision "shell", inline: $script
     config.vm.provider "virtualbox" do |vb|
 		vb.customize ["modifyvm", :id, "--nicpromisc2", "allow-all"]
-	end
+end
   end
   
   
